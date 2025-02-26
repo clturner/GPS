@@ -1,66 +1,57 @@
 #!/usr/bin/env python
+import csv
+import math
 
 """
 Calculates new gps coordinates based on input Latitude/Longitude, Bearing and Distance
 Rewrites the GPS coordinates to the csv file in the place of input Latitude/Longitude
 """
 
-import csv
-import math
-import sys
+# Get user inputs
+file_name = input("Enter the path to your CSV file: ")
 
-file_name = input("enter the name, or path to, your csv file and press return -> ")
+lat_column_number = int(input("Enter the column number of Latitude: "))
+lon_column_number = int(input("Enter the column number of Longitude: "))
+brng_column_number = int(input("Enter the column number of Bearing: "))
+distance_column_number = int(input("Enter the column number of Distance: "))
 
-lat_column_number = input("enter the column number of Latitude in your csv file and press return -> ")
-converted_lat_column_number = int(lat_column_number)
+R = 6378.1  # Radius of the Earth in km
 
-lon_column_number = input("enter the column number of Longitude in your csv file and press return -> ")
-converted_lon_column_number = int(lon_column_number)
+lines = []
 
-brng_column_number = input("enter the column number of Bearing in your csv file and press return -> ")
-converted_brng_column_number = int(brng_column_number)
-
-distance_column_number = input("enter the column number of Distance in your csv file and press return -> ")
-converted_distance_column_number = int(distance_column_number)
-
-R = 6378.1 #Radius of the Earth
-lines = [[]]
-with open(file_name, 'rU') as csvfile:
+# Read CSV file
+with open(file_name, 'r', newline='') as csvfile:
     reader = csv.reader(csvfile)
+    headers = next(reader)  # Read the first row as headers
+    lines.append(headers)   # Store headers
 
-    for i, row in enumerate(reader):
-        if i is 0:
-            lines.append(row)
-        if i is not 0:
+    for row in reader:
+        try:
+            # Convert values
+            lat1 = math.radians(float(row[lat_column_number]))
+            lon1 = math.radians(float(row[lon_column_number]))
+            brng = math.radians(float(row[brng_column_number]))  # Convert bearing to radians
+            d = float(row[distance_column_number]) / 1000  # Convert distance to km
 
-            converted_lat = float(row[converted_lat_column_number])
-            converted_long = float(row[converted_lon_column_number])
-            converted_brng = float(row[converted_brng_column_number])
-            converted_d = float(row[converted_distance_column_number])
+            # Calculate new latitude
+            lat2 = math.asin(math.sin(lat1) * math.cos(d / R) +
+                             math.cos(lat1) * math.sin(d / R) * math.cos(brng))
 
-            converted_d = converted_d/1000
+            # Calculate new longitude
+            lon2 = lon1 + math.atan2(math.sin(brng) * math.sin(d / R) * math.cos(lat1),
+                                     math.cos(d / R) - math.sin(lat1) * math.sin(lat2))
 
-            lat1 = math.radians(converted_lat) #Current lat point converted to radians
+            # Convert back to degrees
+            row[lat_column_number] = round(math.degrees(lat2), 6)
+            row[lon_column_number] = round(math.degrees(lon2), 6)
+        except ValueError:
+            print(f"Skipping row due to invalid data: {row}")
+        
+        lines.append(row)
 
-            lon1 = math.radians(converted_long) #Current long point converted to radians
+# Write updated data back to the file
+with open(file_name, 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerows(lines)
 
-            #Do Trigonometry to find new Latitude
-            lat2 = math.asin( math.sin(lat1)*math.cos(converted_brng/R) +
-                              math.cos(lat1)*math.sin(converted_d/R)*math.cos(converted_brng))
-
-            #Do Trigonometry to find new Longitude
-            lon2 = lon1 + math.atan2(math.sin(converted_brng)*math.sin(converted_d/R)*math.cos(lat1),
-                                     math.cos(converted_d/R)-math.sin(lat1)*math.sin(lat2))
-
-            #Convert Latitude and Longitude back to degrees
-            lat2 = math.degrees(lat2)
-            lon2 = math.degrees(lon2)
-
-            #Rewrite the csv file with ne coodinates
-            r = csv.reader('test.csv')
-            row[converted_lat_column_number] = lat2
-            row[converted_lon_column_number] = lon2
-            lines.append(row)
-
-writer = csv.writer(open(file_name, 'w'))
-writer.writerows(lines)
+print("Updated coordinates saved successfully.")
